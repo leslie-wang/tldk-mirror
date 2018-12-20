@@ -83,8 +83,8 @@ netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
 	}
 
 	RTE_LOG(NOTICE, USER1,
-		"%s(%u)={s=%p, op=%hu, proto=%s, rxev=%p, txev=%p}, belc=%u\n",
-		__func__, lcore, fes->s, op, proto_name[becfg.proto],
+		"%s(%u)={s=%p, op=%hu, proto=udp, rxev=%p, txev=%p}, belc=%u\n",
+		__func__, lcore, fes->s, op,
 		fes->rxev, fes->txev, becfg.cpu[bidx].id);
 
 	fes->op = op;
@@ -335,9 +335,9 @@ netfe_fwd_udp(uint32_t lcore, struct netfe_stream *fes)
 				(const struct sockaddr *)
 				&fes->fwdprm.remote_addr);
 
-			NETFE_TRACE("%s(%u): tle_%s_stream_send(%p, %u) "
+			NETFE_TRACE("%s(%u): tle_udp_stream_send(%p, %u) "
 				"returns %u\n",
-				__func__, lcore, proto_name[fes->proto],
+				__func__, lcore,
 				fed->s, j - i, k);
 
 			fed->stat.txp += k;
@@ -416,8 +416,8 @@ netfe_rxtx_process_udp(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 		k = tle_udp_stream_send(fes->s, pkt + i, j - i,
 			(const struct sockaddr *)pi0);
 
-		NETFE_TRACE("%s(%u): tle_%s_stream_send(%p, %u) returns %u\n",
-			__func__, lcore, proto_name[fes->proto],
+		NETFE_TRACE("%s(%u): tle_udp_stream_send(%p, %u) returns %u\n",
+			__func__, lcore,
 			fes->s, j - i, k);
 		fes->stat.txp += k;
 		fes->stat.drops += j - i - k;
@@ -466,8 +466,8 @@ netfe_tx_process_udp(uint32_t lcore, struct netfe_stream *fes)
 	 * TODO: cannot use function pointers for unequal param num.
 	 */
 	k = tle_udp_stream_send(fes->s, fes->pbuf.pkt, n, NULL);
-	NETFE_TRACE("%s(%u): tle_%s_stream_send(%p, %u) returns %u\n",
-		__func__, lcore, proto_name[fes->proto], fes->s, n, k);
+	NETFE_TRACE("%s(%u): tle_udp_stream_send(%p, %u) returns %u\n",
+		__func__, lcore, fes->s, n, k);
 	fes->stat.txp += k;
 	fes->stat.drops += n - k;
 

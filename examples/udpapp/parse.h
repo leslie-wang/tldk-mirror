@@ -53,6 +53,8 @@ format_addr(const struct sockaddr_storage *sp, char buf[], size_t len)
 	return inet_ntop(sp->ss_family, addr, buf, len);
 }
 
+int netbe_parse_dest(const char *fname, struct netbe_dest_prm *prm);
+
 int
 parse_app_options(int argc, char **argv, struct netbe_cfg *cfg, struct tle_ctx_param *ctx_prm, char *becfg_fname, struct netfe_lcore_prm *feprm);
 

@@ -64,7 +64,6 @@ static volatile int force_quit;
 static struct netbe_cfg becfg;
 static struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
 static struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
-static char proto_name[3][10] = {"udp", "tcp", ""};
 
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
@@ -77,14 +76,6 @@ struct tx_content tx_content = {
 	.sz = 0,
 	.data = NULL,
 };
-
-/* function pointers */
-static TLE_RX_BULK_FUNCTYPE tle_rx_bulk;
-static TLE_TX_BULK_FUNCTYPE tle_tx_bulk;
-static TLE_STREAM_RECV_FUNCTYPE tle_stream_recv;
-static TLE_STREAM_CLOSE_FUNCTYPE tle_stream_close;
-
-static LCORE_MAIN_FUNCTYPE lcore_main;
 
 #include "common.h"
 #include "lcore.h"
@@ -168,16 +159,6 @@ netbe_dest_init(const char *fname, struct netbe_cfg *cfg)
 	return rc;
 }
 
-static void
-func_ptrs_init() {
-	tle_rx_bulk = tle_udp_rx_bulk;
-	tle_tx_bulk = tle_udp_tx_bulk;
-	tle_stream_recv = tle_udp_stream_recv;
-	tle_stream_close = tle_udp_stream_close;
-
-	lcore_main = lcore_main_udp;
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -212,9 +193,6 @@ main(int argc, char *argv[])
 		rte_exit(EXIT_FAILURE,
 			"%s: parse_app_options failed with error code: %d\n",
 			__func__, rc);
-
-	/* init all the function pointer */
-	func_ptrs_init();
 
 	rc = netbe_port_init(&becfg);
 	if (rc != 0)
@@ -257,13 +235,13 @@ main(int argc, char *argv[])
 	/* launch all slave lcores. */
 	RTE_LCORE_FOREACH_SLAVE(i) {
 		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
-			rte_eal_remote_launch(lcore_main, prm + i, i);
+			rte_eal_remote_launch(lcore_main_udp, prm + i, i);
 	}
 
 	/* launch master lcore. */
 	i = rte_get_master_lcore();
 	if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
-		lcore_main(prm + i);
+		lcore_main_udp(prm + i);
 
 	rte_eal_mp_wait_lcore();
 

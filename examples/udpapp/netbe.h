@@ -38,9 +38,7 @@
 #include <rte_hash.h>
 #include <rte_ip.h>
 #include <rte_ip_frag.h>
-#include <rte_tcp.h>
 #include <rte_udp.h>
-#include <tle_tcp.h>
 #include <tle_udp.h>
 #include <tle_event.h>
 
@@ -139,9 +137,6 @@ struct netbe_lcore {
 	struct tle_dest dst4[LCORE_MAX_DST];
 	struct tle_dest dst6[LCORE_MAX_DST];
 	struct rte_ip_frag_death_row death_row;
-	struct {
-		uint64_t flags[UINT8_MAX + 1];
-	} tcp_stat;
 };
 
 struct netbe_cfg {
@@ -235,11 +230,6 @@ struct netfe_lcore {
 	struct tle_evq *txeq;
 	struct rte_hash *fw4h;
 	struct rte_hash *fw6h;
-	struct {
-		uint64_t acc;
-		uint64_t rej;
-		uint64_t ter;
-	} tcp_stat;
 	struct netfe_stream_list free;
 	struct netfe_stream_list use;
 };

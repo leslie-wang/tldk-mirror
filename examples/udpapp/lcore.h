@@ -276,8 +276,8 @@ create_context(struct netbe_lcore *lc, const struct tle_ctx_param *ctx_prm)
 
 		lc->ctx = tle_ctx_create(&cprm);
 
-		RTE_LOG(NOTICE, USER1, "%s(lcore=%u): proto=%s, ctx=%p;\n",
-			__func__, lc->id, proto_name[lc->proto], lc->ctx);
+		RTE_LOG(NOTICE, USER1, "%s(lcore=%u) - udp: ctx=%p;\n",
+			__func__, lc->id, lc->ctx);
 
 		if (lc->ctx == NULL || lc->ftbl == NULL)
 			rc = ENOMEM;

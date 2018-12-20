@@ -33,7 +33,7 @@ prepare_hash_key(struct netbe_port *uprt, uint8_t key_size, uint16_t family)
 static int
 update_rss_conf(struct netbe_port *uprt,
 	const struct rte_eth_dev_info *dev_info,
-	struct rte_eth_conf *port_conf, uint32_t proto)
+	struct rte_eth_conf *port_conf)
 {
 	uint8_t hash_key_size;
 
@@ -149,7 +149,7 @@ update_rss_reta(struct netbe_port *uprt,
  * In current version, multi-queue per port is used.
  */
 static int
-port_init(struct netbe_port *uprt, uint32_t proto)
+port_init(struct netbe_port *uprt)
 {
 	int32_t rc;
 	struct rte_eth_conf port_conf;
@@ -183,7 +183,7 @@ port_init(struct netbe_port *uprt, uint32_t proto)
 	if (port_conf.rxmode.max_rx_pkt_len > ETHER_MAX_LEN)
 		port_conf.rxmode.jumbo_frame = 1;
 
-	rc = update_rss_conf(uprt, &dev_info, &port_conf, proto);
+	rc = update_rss_conf(uprt, &dev_info, &port_conf);
 	if (rc != 0)
 		return rc;
 
@@ -382,7 +382,7 @@ netbe_port_init(struct netbe_cfg *cfg)
 
 	for (i = 0; i != cfg->prt_num; i++) {
 		prt = cfg->prt + i;
-		rc = port_init(prt, cfg->proto);
+		rc = port_init(prt);
 		if (rc != 0) {
 			RTE_LOG(ERR, USER1,
 				"%s: port=%u init failed with error code: %d\n",

@@ -547,7 +547,6 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg, struct tle_ctx_p
 	uint64_t v;
 	uint32_t i, j, n, nc;
 	rte_cpuset_t cpuset;
-	uint32_t udp = 0, tcp = 0, listen = 0;
 
 	optind = 0;
 	optarg = NULL;
