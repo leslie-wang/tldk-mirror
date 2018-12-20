@@ -15,12 +15,33 @@ ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
 
+ifeq ($(RTE_TARGET),)
+$(error "Please define RTE_TARGET environment variable")
+endif
+
 ifeq ($(TLDK_ROOT),)
-$(error "Please define TLDK_SDK environment variable")
+$(error "Please define TLDK_ROOT environment variable")
 endif
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += l4fwd udpapp
+# binary name
+APP = udpapp
 
-include $(TLDK_ROOT)/mk/tle.subdir.mk
+# all source are stored in SRCS-y
+SRCS-y += pkt.c
+SRCS-y += parse.c
+SRCS-y += main.c
+
+CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -I$(RTE_OUTPUT)/include
+
+LDLIBS += -L$(RTE_OUTPUT)/lib
+LDLIBS += -ltle_l4p
+LDLIBS += -ltle_timer
+
+EXTRA_CFLAGS += -O3 -DNETBE_DEBUG -DNETFE_DEBUG
+CFLAGS_parse.o += -D_GNU_SOURCE
+CFLAGS_main.o += -D_GNU_SOURCE
+
+include $(TLDK_ROOT)/mk/tle.app.mk
