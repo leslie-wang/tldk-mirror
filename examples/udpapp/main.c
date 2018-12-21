@@ -39,8 +39,6 @@
 RTE_DEFINE_PER_LCORE(struct netbe_lcore *, _be);
 RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe);
 
-#include "fwdtbl.h"
-
 /**
  * Location to be modified to create the IPv4 hash key which helps
  * to distribute packets based on the destination TCP/UDP port.

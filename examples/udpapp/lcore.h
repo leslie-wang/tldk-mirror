@@ -455,9 +455,7 @@ netfe_lcore_fill(struct lcore_prm prm[RTE_MAX_LCORE],
 		s = lprm->stream + i;
 		ln = s->line;
 		belc = s->belcore;
-		if (netfe_sprm_flll_be(&s->sprm, ln, belc) != 0 ||
-				(s->op == FWD &&
-				netfe_sprm_flll_be(&s->fprm, ln, belc) != 0))
+		if (netfe_sprm_flll_be(&s->sprm, ln, belc) != 0)
 			return -EINVAL;
 	}
 

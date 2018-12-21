@@ -21,7 +21,7 @@
  */
 static struct netfe_stream *
 netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
-	uint32_t lcore, uint16_t op, uint32_t bidx)
+	uint32_t lcore, uint32_t bidx)
 {
 	int32_t rc;
 	struct netfe_stream *fes;
@@ -45,22 +45,14 @@ netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
 		return NULL;
 	}
 
-	if (op == TXONLY || op == FWD) {
-		tle_event_active(fes->txev, TLE_SEV_DOWN);
-		fes->stat.txev[TLE_SEV_DOWN]++;
-	}
-
-	if (op != TXONLY) {
-		tle_event_active(fes->rxev, TLE_SEV_DOWN);
-		fes->stat.rxev[TLE_SEV_DOWN]++;
-	}
+	tle_event_active(fes->rxev, TLE_SEV_DOWN);
+	fes->stat.rxev[TLE_SEV_DOWN]++;
 
 	memset(&uprm, 0, sizeof(uprm));
 	uprm.local_addr = sprm->local_addr;
 	uprm.remote_addr = sprm->remote_addr;
 	uprm.recv_ev = fes->rxev;
-	if (op != FWD)
-		uprm.send_ev = fes->txev;
+	uprm.send_ev = fes->txev;
 	fes->s = tle_udp_stream_open(becfg.cpu[bidx].ctx, &uprm);
 
 	if (fes->s == NULL) {
@@ -83,12 +75,10 @@ netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
 	}
 
 	RTE_LOG(NOTICE, USER1,
-		"%s(%u)={s=%p, op=%hu, proto=udp, rxev=%p, txev=%p}, belc=%u\n",
-		__func__, lcore, fes->s, op,
+		"%s(%u)={s=%p, proto=udp, rxev=%p, txev=%p}, belc=%u\n",
+		__func__, lcore, fes->s,
 		fes->rxev, fes->txev, becfg.cpu[bidx].id);
 
-	fes->op = op;
-	fes->proto = becfg.proto;
 	fes->family = sprm->local_addr.ss_family;
 
 	return fes;
@@ -144,22 +134,10 @@ netfe_lcore_init_udp(const struct netfe_lcore_prm *prm)
 	if (fe->rxeq == NULL || fe->txeq == NULL)
 		return -ENOMEM;
 
-	rc = fwd_tbl_init(fe, AF_INET, lcore);
-	RTE_LOG(ERR, USER1, "%s(%u) fwd_tbl_init(%u) returns %d\n",
-		__func__, lcore, AF_INET, rc);
-	if (rc != 0)
-		return rc;
-
-	rc = fwd_tbl_init(fe, AF_INET6, lcore);
-	RTE_LOG(ERR, USER1, "%s(%u) fwd_tbl_init(%u) returns %d\n",
-		__func__, lcore, AF_INET6, rc);
-	if (rc != 0)
-		return rc;
-
 	/* open all requested streams. */
 	for (i = 0; i != prm->nb_streams; i++) {
 		sprm = &prm->stream[i].sprm;
-		fes = netfe_stream_open_udp(fe, sprm, lcore, prm->stream[i].op,
+		fes = netfe_stream_open_udp(fe, sprm, lcore,
 			sprm->bidx);
 		if (fes == NULL) {
 			rc = -rte_errno;
@@ -167,64 +145,9 @@ netfe_lcore_init_udp(const struct netfe_lcore_prm *prm)
 		}
 
 		netfe_stream_dump(fes, &sprm->local_addr, &sprm->remote_addr);
-
-		if (prm->stream[i].op == FWD) {
-			fes->fwdprm = prm->stream[i].fprm;
-			rc = fwd_tbl_add(fe,
-				prm->stream[i].fprm.remote_addr.ss_family,
-				(const struct sockaddr *)
-				&prm->stream[i].fprm.remote_addr,
-				fes);
-			if (rc != 0) {
-				netfe_stream_close(fe, fes);
-				break;
-			}
-		} else if (prm->stream[i].op == TXONLY) {
-			fes->txlen = prm->stream[i].txlen;
-			fes->raddr = prm->stream[i].sprm.remote_addr;
-		}
 	}
 
 	return rc;
-}
-
-static struct netfe_stream *
-find_fwd_dst_udp(uint32_t lcore, struct netfe_stream *fes,
-	const struct sockaddr *sa)
-{
-	uint32_t rc;
-	struct netfe_stream *fed;
-	struct netfe_lcore *fe;
-	struct tle_udp_stream_param uprm;
-
-	fe = RTE_PER_LCORE(_fe);
-
-	fed = fwd_tbl_lkp(fe, fes->family, sa);
-	if (fed != NULL)
-		return fed;
-
-	/* create a new stream and put it into the fwd table. */
-	memset(&uprm, 0, sizeof(uprm));
-	uprm.local_addr = fes->fwdprm.local_addr;
-	uprm.remote_addr = fes->fwdprm.remote_addr;
-
-	/* open forward stream with wildcard remote addr. */
-	memset(&uprm.remote_addr.ss_family + 1, 0,
-		sizeof(uprm.remote_addr) - sizeof(uprm.remote_addr.ss_family));
-
-	fed = netfe_stream_open_udp(fe, &fes->fwdprm, lcore, FWD,
-		fes->fwdprm.bidx);
-	if (fed == NULL)
-		return NULL;
-
-	rc = fwd_tbl_add(fe, fes->family, sa, fed);
-	if (rc != 0) {
-		netfe_stream_close(fe, fed);
-		fed = NULL;
-	}
-
-	fed->fwdprm.remote_addr = *(const struct sockaddr_storage *)sa;
-	return fed;
 }
 
 static inline int
@@ -291,91 +214,6 @@ pkt_eq_addr(struct rte_mbuf *pkt[], uint32_t num, uint16_t family,
 	}
 
 	return i;
-}
-
-static inline void
-netfe_fwd_udp(uint32_t lcore, struct netfe_stream *fes)
-{
-	uint32_t i, j, k, n, x;
-	uint16_t family;
-	void *pi0, *pi1, *pt;
-	struct rte_mbuf **pkt;
-	struct netfe_stream *fed;
-	struct sockaddr_storage in[2];
-
-	family = fes->family;
-	n = fes->pbuf.num;
-	pkt = fes->pbuf.pkt;
-
-	if (n == 0)
-		return;
-
-	in[0].ss_family = family;
-	in[1].ss_family = family;
-	pi0 = &in[0];
-	pi1 = &in[1];
-
-	netfe_pkt_addr(pkt[0], pi0, family);
-
-	x = 0;
-	for (i = 0; i != n; i = j) {
-
-		j = i + pkt_eq_addr(&pkt[i + 1],
-			n - i - 1, family, pi0, pi1) + 1;
-
-		fed = find_fwd_dst_udp(lcore, fes,
-			(const struct sockaddr *)pi0);
-		if (fed != NULL) {
-
-			/**
-			 * TODO: cannot use function pointers for unequal
-			 * number of params.
-			 */
-			k = tle_udp_stream_send(fed->s, pkt + i, j - i,
-				(const struct sockaddr *)
-				&fes->fwdprm.remote_addr);
-
-			NETFE_TRACE("%s(%u): tle_udp_stream_send(%p, %u) "
-				"returns %u\n",
-				__func__, lcore,
-				fed->s, j - i, k);
-
-			fed->stat.txp += k;
-			fed->stat.drops += j - i - k;
-			fes->stat.fwp += k;
-
-		} else {
-			NETFE_TRACE("%s(%u, %p): no fwd stream for %u pkts;\n",
-				__func__, lcore, fes->s, j - i);
-			for (k = i; k != j; k++) {
-				NETFE_TRACE("%s(%u, %p): free(%p);\n",
-				__func__, lcore, fes->s, pkt[k]);
-				rte_pktmbuf_free(pkt[j]);
-			}
-			fes->stat.drops += j - i;
-		}
-
-		/* copy unforwarded mbufs. */
-		for (i += k; i != j; i++, x++)
-			pkt[x] = pkt[i];
-
-		/* swap the pointers */
-		pt = pi0;
-		pi0 = pi1;
-		pi1 = pt;
-	}
-
-	fes->pbuf.num = x;
-
-	if (x != 0) {
-		tle_event_raise(fes->txev);
-		fes->stat.txev[TLE_SEV_UP]++;
-	}
-
-	if (n == RTE_DIM(fes->pbuf.pkt)) {
-		tle_event_active(fes->rxev, TLE_SEV_UP);
-		fes->stat.rxev[TLE_SEV_UP]++;
-	}
 }
 
 static inline void
@@ -451,36 +289,6 @@ netfe_rxtx_process_udp(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 }
 
 static inline void
-netfe_tx_process_udp(uint32_t lcore, struct netfe_stream *fes)
-{
-	uint32_t i, k, n;
-
-	/* refill with new mbufs. */
-	pkt_buf_fill(lcore, &fes->pbuf, fes->txlen);
-
-	n = fes->pbuf.num;
-	if (n == 0)
-		return;
-
-	/**
-	 * TODO: cannot use function pointers for unequal param num.
-	 */
-	k = tle_udp_stream_send(fes->s, fes->pbuf.pkt, n, NULL);
-	NETFE_TRACE("%s(%u): tle_udp_stream_send(%p, %u) returns %u\n",
-		__func__, lcore, fes->s, n, k);
-	fes->stat.txp += k;
-	fes->stat.drops += n - k;
-
-	if (k == 0)
-		return;
-
-	/* adjust pbuf array. */
-	fes->pbuf.num = n - k;
-	for (i = k; i != n; i++)
-		fes->pbuf.pkt[i - k] = fes->pbuf.pkt[i];
-}
-
-static inline void
 netfe_lcore_udp(void)
 {
 	struct netfe_lcore *fe;
@@ -510,12 +318,7 @@ netfe_lcore_udp(void)
 		NETFE_TRACE("%s(%u): tle_evq_get(txevq=%p) returns %u\n",
 			__func__, lcore, fe->txeq, n);
 		for (j = 0; j != n; j++) {
-			if (fs[j]->op == ECHO)
-				netfe_rxtx_process_udp(lcore, fs[j]);
-			else if (fs[j]->op == FWD)
-				netfe_fwd_udp(lcore, fs[j]);
-			else if (fs[j]->op == TXONLY)
-				netfe_tx_process_udp(lcore, fs[j]);
+			netfe_rxtx_process_udp(lcore, fs[j]);
 		}
 	}
 }
@@ -548,7 +351,7 @@ netfe_lcore_fini_udp(void)
 static int
 lcore_main_udp(void *arg)
 {
-	int32_t rc;
+	int32_t rc = 0;
 	uint32_t lcore;
 	struct lcore_prm *prm;
 
@@ -557,8 +360,6 @@ lcore_main_udp(void *arg)
 
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u) start\n",
 		__func__, lcore);
-
-	rc = 0;
 
 	/* lcore FE init. */
 	if (prm->fe.max_streams != 0)

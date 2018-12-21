@@ -55,34 +55,6 @@ fwd_tbl_key_prep(const struct netfe_lcore *fe, uint16_t family,
 }
 
 static int
-fwd_tbl_add(struct netfe_lcore *fe, uint16_t family, const struct sockaddr *sa,
-	struct netfe_stream *data)
-{
-	int32_t rc;
-	struct rte_hash *h;
-	union fwd_key key;
-
-	h = fwd_tbl_key_prep(fe, family, sa, &key);
-	rc = rte_hash_add_key_data(h, &key, data);
-	return rc;
-}
-
-static struct netfe_stream *
-fwd_tbl_lkp(struct netfe_lcore *fe, uint16_t family, const struct sockaddr *sa)
-{
-	int rc;
-	void *d;
-	struct rte_hash *h;
-	union fwd_key key;
-
-	h = fwd_tbl_key_prep(fe, family, sa, &key);
-	rc = rte_hash_lookup_data(h, &key, &d);
-	if (rc < 0)
-		d = NULL;
-	return d;
-}
-
-static int
 fwd_tbl_init(struct netfe_lcore *fe, uint16_t family, uint32_t lcore)
 {
 	int32_t rc;

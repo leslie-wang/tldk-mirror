@@ -25,17 +25,6 @@
 
 #define DEF_LINE_NUM	0x400
 
-static const struct {
-	const char *name;
-	uint16_t op;
-} name2feop[] = {
-	{ .name = "rx", .op = RXONLY,},
-	{ .name = "tx", .op = TXONLY,},
-	{ .name = "echo", .op = ECHO,},
-	{ .name = "rxtx", .op = RXTX,},
-	{ .name = "fwd", .op = FWD,},
-};
-
 #define	OPT_SHORT_SBULK		'B'
 #define	OPT_LONG_SBULK		"sburst"
 
@@ -177,23 +166,6 @@ parse_mac_val(__rte_unused const char *key, const char *val, void *prm)
 	PARSE_UINT8x16(s, rv->mac.addr_bytes[4], ':');
 	PARSE_UINT8x16(s, rv->mac.addr_bytes[5], 0);
 	return 0;
-}
-
-static int
-parse_feop_val(__rte_unused const char *key, const char *val, void *prm)
-{
-	uint32_t i;
-	union parse_val *rv;
-
-	rv = prm;
-	for (i = 0; i != RTE_DIM(name2feop); i++) {
-		if (strcmp(val, name2feop[i].name) == 0) {
-			rv->u64 = name2feop[i].op;
-			return 0;
-		}
-	}
-
-	return -EINVAL;
 }
 
 static int
@@ -552,8 +524,6 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg, struct tle_ctx_p
 	optarg = NULL;
 	
 	// set default
-	cfg->proto = TLE_PROTO_UDP;
-
 	feprm->max_streams = 1;
 	feprm->nb_streams = 1;
 	feprm->stream = malloc(sizeof(struct netfe_stream_prm));
@@ -706,7 +676,6 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg, struct tle_ctx_p
 
 	// configure lp
        	feprm->stream->lcore = cfg->prt[0].lcore_id[0];
-       	feprm->stream->op = ECHO;
 	feprm->stream->sprm.remote_addr.ss_family = AF_INET;;
 	struct sockaddr_in *si = (struct sockaddr_in *)&feprm->stream->sprm.remote_addr;
 	si->sin_port = rte_cpu_to_be_16(0);

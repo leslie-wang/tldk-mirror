@@ -692,7 +692,6 @@ static inline int
 netfe_rx_process(uint32_t lcore, struct netfe_stream *fes)
 {
 	uint32_t k, n;
-	uint64_t count_bytes;
 
 	n = fes->pbuf.num;
 	k = RTE_DIM(fes->pbuf.pkt) - n;
@@ -715,40 +714,10 @@ netfe_rx_process(uint32_t lcore, struct netfe_stream *fes)
 	fes->stat.rxp += n;
 
 	/* free all received mbufs. */
-	if (fes->op == RXONLY)
-		fes->stat.rxb += pkt_buf_empty(&fes->pbuf);
-	else if (fes->op == RXTX) {
-		/* RXTX mode. Count incoming bytes then discard.
-		 * If receive threshold (rxlen) exceeded, send out a packet.
-		 */
-		count_bytes = pkt_buf_empty(&fes->pbuf);
-		fes->stat.rxb += count_bytes;
-		fes->rx_run_len += count_bytes;
-		if (fes->rx_run_len >= fes->rxlen) {
-			/* Idle Rx as buffer needed for Tx */
-			tle_event_idle(fes->rxev);
-			fes->stat.rxev[TLE_SEV_IDLE]++;
-
-			/* Discard surplus bytes. For now pipelining of
-			 * requests is not supported.
-			 */
-			fes->rx_run_len = 0;
-			netfe_rxtx_dispatch_reply(lcore, fes);
-
-			/* Kick off a Tx event */
-			tle_event_active(fes->txev, TLE_SEV_UP);
-			fes->stat.txev[TLE_SEV_UP]++;
-		}
-	}
 	/* mark stream as writable */
-	else if (k == RTE_DIM(fes->pbuf.pkt)) {
-		if (fes->op == ECHO) {
+	if (k == RTE_DIM(fes->pbuf.pkt)) {
 			tle_event_active(fes->txev, TLE_SEV_UP);
 			fes->stat.txev[TLE_SEV_UP]++;
-		} else if (fes->op == FWD) {
-			tle_event_raise(fes->txev);
-			fes->stat.txev[TLE_SEV_UP]++;
-		}
 	}
 
 	return n;

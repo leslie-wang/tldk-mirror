@@ -154,14 +154,6 @@ struct netbe_cfg {
  * FE related structures.
  */
 
-enum {
-	RXONLY,
-	TXONLY,
-	RXTX,
-	ECHO,
-	FWD,
-};
-
 struct netfe_sprm {
 	uint32_t bidx;  /* BE index to use. */
 	struct sockaddr_storage local_addr;  /**< stream local address. */
@@ -172,11 +164,7 @@ struct netfe_stream_prm {
 	uint32_t lcore;
 	uint32_t belcore;
 	uint16_t line;
-	uint16_t op;
-	uint32_t txlen; /* valid/used only for TXONLY op. */
-	uint32_t rxlen; /* Used by RXTX */
 	struct netfe_sprm sprm;
-	struct netfe_sprm fprm;  /* valid/used only for FWD op. */
 };
 
 struct netfe_lcore_prm {
@@ -190,8 +178,6 @@ struct netfe_stream {
 	struct tle_event *erev;
 	struct tle_event *rxev;
 	struct tle_event *txev;
-	uint16_t op;
-	uint16_t proto;
 	uint16_t family;
 	uint32_t txlen;
 	uint32_t rxlen;
