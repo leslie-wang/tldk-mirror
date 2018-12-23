@@ -16,10 +16,12 @@ run udpapp as
 
 above command means bind port at 192.168.8.100:3000 at port 0 and lcore 1
 
-configure manual arp at client side:
- - sudo arp -s 192.168.8.100 00:0c:29:cd:c0:b7
-
 now start test using nc command from client side
  - $ nc -u 192.168.8.100 3000
 
 if you input `1234\n`, and you will get `1234\n`
+
+note that since arp support is added, so below step is not required anymore
+configure manual arp at client side:
+ - sudo arp -s 192.168.8.100 00:0c:29:cd:c0:b7
+

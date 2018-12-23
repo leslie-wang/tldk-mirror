@@ -288,7 +288,7 @@ ipv4x_cksum(const void *iph, size_t len)
 }
 
 static inline void
-fix_reassembled(struct rte_mbuf *m, int32_t hwcsum, uint32_t proto)
+fix_reassembled(struct rte_mbuf *m, int32_t hwcsum)
 {
 	struct ipv4_hdr *iph;
 
@@ -311,8 +311,7 @@ fix_reassembled(struct rte_mbuf *m, int32_t hwcsum, uint32_t proto)
 }
 
 static struct rte_mbuf *
-reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
-	dpdk_port_t port, uint32_t proto)
+reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms, dpdk_port_t port)
 {
 	uint32_t l3cs;
 	struct rte_ip_frag_tbl *tbl;
@@ -356,7 +355,7 @@ reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
 
 	/* got reassembled packet. */
 	if (m != NULL)
-		fix_reassembled(m, l3cs, proto);
+		fix_reassembled(m, l3cs);
 
 	return m;
 }
@@ -393,12 +392,12 @@ compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
  * if by some reason it can't be done, then
  * set pkt[] entry to NULL.
  */
-#define DO_REASSEMBLE(proto) \
+#define DO_REASSEMBLE \
 do { \
 	if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) == \
 			RTE_PTYPE_L4_FRAG) { \
 		cts = (cts == 0) ? rte_rdtsc() : cts; \
-		pkt[j] = reassemble(pkt[j], lc, cts, port, (proto)); \
+		pkt[j] = reassemble(pkt[j], lc, cts, port); \
 		x += (pkt[j] == NULL); \
 	} \
 } while (0)
@@ -472,7 +471,7 @@ type0_udp_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 			break;
 		}
 
-		DO_REASSEMBLE(IPPROTO_UDP);
+		DO_REASSEMBLE;
 	}
 
 	/* reassemble was invoked, cleanup its death-row. */
@@ -542,7 +541,7 @@ type1_udp_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 			break;
 		}
 
-		DO_REASSEMBLE(IPPROTO_UDP);
+		DO_REASSEMBLE;
 	}
 
 	/* reassemble was invoked, cleanup its death-row. */
@@ -580,7 +579,12 @@ typen_udp_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 		NETBE_PKT_DUMP(pkt[j]);
 		fill_eth_udp_hdr_len(pkt[j]);
 
-		DO_REASSEMBLE(IPPROTO_UDP);
+		DO_REASSEMBLE;
+
+		const struct ether_hdr *eth = rte_pktmbuf_mtod(pkt[j], const struct ether_hdr *);
+
+		if ( eth->ether_type == rte_be_to_cpu_16(ETHER_TYPE_ARP))
+			handle_arp(pkt[j], lc, port, sizeof(struct ether_hdr));
 	}
 
 	/* reassemble was invoked, cleanup its death-row. */
@@ -646,8 +650,7 @@ get_ptypes(const struct netbe_port *uprt)
 }
 
 int
-setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
-	uint16_t qid, uint32_t arp)
+setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc, uint16_t qid)
 {
 	int32_t rc;
 	uint32_t i, n, smask;

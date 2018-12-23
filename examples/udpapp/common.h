@@ -244,8 +244,7 @@ netbe_lcore_setup(struct netbe_lcore *lc)
 			__func__, i, lc->prtq[i].port.id, lc->prtq[i].rxqid,
 			lc->prtq[i].dev);
 
-		rc = setup_rx_cb(&lc->prtq[i].port, lc, lc->prtq[i].rxqid,
-			becfg.arp);
+		rc = setup_rx_cb(&lc->prtq[i].port, lc, lc->prtq[i].rxqid);
 		if (rc < 0)
 			return rc;
 	}

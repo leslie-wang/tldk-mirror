@@ -293,8 +293,7 @@ extern struct tx_content tx_content;
 	} \
 } while (0)
 
-int setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
-	uint16_t qid, uint32_t arp);
+int setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc, uint16_t qid);
 
 /*
  * application function pointers
